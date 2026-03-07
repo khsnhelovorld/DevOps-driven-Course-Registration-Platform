@@ -1,0 +1,156 @@
+# UIT Đăng ký học phần - Local Docker Compose
+# Run: docker-compose up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: uit-dkhp-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-uit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-uit_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-uit_dkhp}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - uit-dkhp-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-uit} -d ${POSTGRES_DB:-uit_dkhp}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: uit-dkhp-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - uit-dkhp-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: uit-dkhp-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-uit}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-uit_secret}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - uit-dkhp-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
+    container_name: uit-dkhp-gateway
+    restart: unless-stopped
+    ports:
+      - "${GATEWAY_PORT:-8080}:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - uit-dkhp-network
+
+  auth-service:
+    build:
+      context: ./services/auth
+      dockerfile: Dockerfile
+    container_name: uit-dkhp-auth
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-uit}:${POSTGRES_PASSWORD:-uit_secret}@postgres:5432/${POSTGRES_DB:-uit_dkhp}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - uit-dkhp-network
+
+  course-service:
+    build:
+      context: ./services/course
+      dockerfile: Dockerfile
+    container_name: uit-dkhp-course
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      DATABASE_URL: postgresql://${POSTGRES_USER:-uit}:${POSTGRES_PASSWORD:-uit_secret}@postgres:5432/${POSTGRES_DB:-uit_dkhp}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - uit-dkhp-network
+
+  registration-service:
+    build:
+      context: ./services/registration
+      dockerfile: Dockerfile
+    container_name: uit-dkhp-registration
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3003
+      DATABASE_URL: postgresql://${POSTGRES_USER:-uit}:${POSTGRES_PASSWORD:-uit_secret}@postgres:5432/${POSTGRES_DB:-uit_dkhp}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-uit}:${RABBITMQ_PASSWORD:-uit_secret}@rabbitmq:5672
+      AUTH_SERVICE_URL: http://auth-service:3001
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - uit-dkhp-network
+
+  notification-service:
+    build:
+      context: ./services/notification
+      dockerfile: Dockerfile
+    container_name: uit-dkhp-notification
+    environment:
+      NODE_ENV: production
+      PORT: 3004
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-uit}:${RABBITMQ_PASSWORD:-uit_secret}@rabbitmq:5672
+      REDIS_URL: redis://redis:6379
+      MAILTRAP_HOST: ${MAILTRAP_HOST:-smtp.mailtrap.io}
+      MAILTRAP_PORT: ${MAILTRAP_PORT:-2525}
+      MAILTRAP_USER: ${MAILTRAP_USER:-}
+      MAILTRAP_PASS: ${MAILTRAP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-noreply@uit-dkhp.local}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - uit-dkhp-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  uit-dkhp-network:
+    driver: bridge
