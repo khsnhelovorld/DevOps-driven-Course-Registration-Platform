@@ -1,26 +1,17 @@
 resource "azurerm_resource_group" "rg" {
-  name     = "devops-rg"
-  location = "Southeast Asia"
+  name     = var.resource_group_name
+  location = var.location
 }
 
-resource "azurerm_kubernetes_cluster" "aks" {
-
-  name                = "devops-aks"
-  location            = azurerm_resource_group.rg.location
-
+module "vnet" {
+  source              = "./modules/vnet"
   resource_group_name = azurerm_resource_group.rg.name
-
-  dns_prefix          = "devopsaks"
-
-  default_node_pool {
-    name       = "default"
-    node_count = 2
-    vm_size    = "Standard_B2s"
-  }
-
-  identity {
-    type = "SystemAssigned"
-  }
-
+  location            = azurerm_resource_group.rg.location
 }
 
+module "aks" {
+  source              = "./modules/aks"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  vnet_subnet_id      = module.vnet.aks_subnet_id
+}
