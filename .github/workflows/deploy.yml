@@ -4,13 +4,13 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch: # Cho phép chạy thủ công
+  workflow_dispatch:
 
 env:
-  ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }} # VD: uitdkhpacr2026.azurecr.io
-  ACR_NAME: ${{ secrets.ACR_NAME }}                 # VD: uitdkhpacr2026
-  AKS_CLUSTER_NAME: ${{ secrets.AKS_CLUSTER_NAME }} # VD: devops-aks-cluster
-  AKS_RESOURCE_GROUP: ${{ secrets.AKS_RESOURCE_GROUP }} # VD: uit-dkhp-rg
+  ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
+  ACR_NAME: ${{ secrets.ACR_NAME }}
+  AKS_CLUSTER_NAME: ${{ secrets.AKS_CLUSTER_NAME }}
+  AKS_RESOURCE_GROUP: ${{ secrets.AKS_RESOURCE_GROUP }}
 
 jobs:
   build-and-push:
@@ -87,6 +87,7 @@ jobs:
           kubectl apply -f k8s/base/
           kubectl apply -f k8s/backing-services/
           kubectl apply -f k8s/services/
+          kubectl apply -f k8s/autoscaling/
           kubectl apply -f k8s/ingress/
           
       - name: Restart Deployments to pull latest image

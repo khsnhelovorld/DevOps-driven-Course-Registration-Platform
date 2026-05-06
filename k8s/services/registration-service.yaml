@@ -15,6 +15,13 @@ spec:
       containers:
       - name: registration-service
         image: YOUR_ACR.azurecr.io/registration-service:latest
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
         ports:
         - containerPort: 3003
         envFrom:

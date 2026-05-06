@@ -15,6 +15,13 @@ spec:
       containers:
       - name: notification-service
         image: YOUR_ACR.azurecr.io/notification-service:latest
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "128Mi"
+          limits:
+            cpu: "250m"
+            memory: "256Mi"
         ports:
         - containerPort: 3004
         envFrom:

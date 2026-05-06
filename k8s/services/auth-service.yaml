@@ -16,6 +16,13 @@ spec:
       - name: auth-service
         # TODO: Cập nhật ACR url (vd: uitdkhpacr2026.azurecr.io/auth-service:latest)
         image: YOUR_ACR.azurecr.io/auth-service:latest
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
         ports:
         - containerPort: 3001
         envFrom:

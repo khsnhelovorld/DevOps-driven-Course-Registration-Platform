@@ -15,6 +15,13 @@ spec:
       containers:
       - name: api-gateway
         image: YOUR_ACR.azurecr.io/api-gateway:latest
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
         ports:
         - containerPort: 80
 ---
