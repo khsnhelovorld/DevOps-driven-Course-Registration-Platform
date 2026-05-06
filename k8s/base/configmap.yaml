@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: uit-dkhp-config
+  namespace: default
+data:
+  NODE_ENV: "production"
+  AUTH_SERVICE_URL: "http://auth-service:3001"
+  REDIS_URL: "redis://redis:6379"
+  RABBITMQ_URL: "amqp://uit:uit_secret@rabbitmq:5672"
+  MAILTRAP_HOST: "smtp.mailtrap.io"
+  MAILTRAP_PORT: "2525"
+  MAIL_FROM: "noreply@uit-dkhp.local"

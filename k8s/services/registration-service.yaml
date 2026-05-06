@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: registration-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: registration-service
+  template:
+    metadata:
+      labels:
+        app: registration-service
+    spec:
+      containers:
+      - name: registration-service
+        image: YOUR_ACR.azurecr.io/registration-service:latest
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        ports:
+        - containerPort: 3003
+        envFrom:
+        - configMapRef:
+            name: uit-dkhp-config
+        - secretRef:
+            name: uit-dkhp-secret
+        env:
+        - name: PORT
+          value: "3003"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: registration-service
+spec:
+  ports:
+  - port: 3003
+  selector:
+    app: registration-service

@@ -1,0 +1,99 @@
+name: CI/CD Pipeline for Microservices on AKS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
+  ACR_NAME: ${{ secrets.ACR_NAME }}
+  AKS_CLUSTER_NAME: ${{ secrets.AKS_CLUSTER_NAME }}
+  AKS_RESOURCE_GROUP: ${{ secrets.AKS_RESOURCE_GROUP }}
+
+jobs:
+  build-and-push:
+    name: Build and Push Images to ACR
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [auth-service, course-service, registration-service, notification-service, api-gateway]
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Login to Azure Container Registry
+        run: az acr login --name ${{ env.ACR_NAME }}
+
+      - name: Build and Push Docker Image
+        run: |
+          # Xác định thư mục (context) và file Dockerfile tương ứng cho từng service
+          if [ "${{ matrix.service }}" == "api-gateway" ]; then
+            CONTEXT="."
+            DOCKERFILE="Dockerfile.gateway"
+          else
+            # Chuyển đổi tên service (auth-service -> auth)
+            DIR_NAME=$(echo ${{ matrix.service }} | sed 's/-service//')
+            CONTEXT="services/$DIR_NAME"
+            DOCKERFILE="$CONTEXT/Dockerfile"
+          fi
+
+          IMAGE_NAME="${{ matrix.service }}"
+          TAG=${{ github.sha }} # Dùng Git commit hash làm tag để đảm bảo tính versioning
+          
+          echo "Building $IMAGE_NAME with context $CONTEXT and Dockerfile $DOCKERFILE..."
+          
+          # Build image với tag cụ thể và tag latest
+          docker build -t $ACR_LOGIN_SERVER/$IMAGE_NAME:$TAG -t $ACR_LOGIN_SERVER/$IMAGE_NAME:latest -f $DOCKERFILE $CONTEXT
+          
+          # Push image lên ACR
+          docker push $ACR_LOGIN_SERVER/$IMAGE_NAME:$TAG
+          docker push $ACR_LOGIN_SERVER/$IMAGE_NAME:latest
+
+  deploy-to-aks:
+    name: Deploy to Azure Kubernetes Service
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set AKS Context
+        uses: azure/aks-set-context@v3
+        with:
+          resource-group: ${{ env.AKS_RESOURCE_GROUP }}
+          cluster-name: ${{ env.AKS_CLUSTER_NAME }}
+
+      - name: Update Kubernetes Manifests
+        run: |
+          echo "Updating ACR Login Server in manifests..."
+          # Đổi biến placeholder thành ACR thực tế
+          find k8s/services -name "*.yaml" -exec sed -i "s|YOUR_ACR.azurecr.io|${{ env.ACR_LOGIN_SERVER }}|g" {} +
+
+      - name: Apply Kubernetes Manifests
+        run: |
+          kubectl apply -f k8s/base/
+          kubectl apply -f k8s/backing-services/
+          kubectl apply -f k8s/services/
+          kubectl apply -f k8s/autoscaling/
+          kubectl apply -f k8s/ingress/
+          
+      - name: Restart Deployments to pull latest image
+        run: |
+          kubectl rollout restart deployment/auth-service
+          kubectl rollout restart deployment/course-service
+          kubectl rollout restart deployment/registration-service
+          kubectl rollout restart deployment/notification-service
+          kubectl rollout restart deployment/api-gateway
