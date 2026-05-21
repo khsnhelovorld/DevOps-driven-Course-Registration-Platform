@@ -14,6 +14,12 @@ out/
 frontend/dist/
 services/*/dist/
 
+# TypeScript / Vite build cache
+*.tsbuildinfo
+frontend/*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
+
 # Logs
 *.log
 npm-debug.log*
