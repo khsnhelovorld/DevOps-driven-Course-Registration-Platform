@@ -24,7 +24,8 @@ spec:
             cpu: "500m"
             memory: "512Mi"
         ports:
-        - containerPort: 3001
+        - name: http
+          containerPort: 3001
         envFrom:
         - configMapRef:
             name: uit-dkhp-config
@@ -38,8 +39,12 @@ apiVersion: v1
 kind: Service
 metadata:
   name: auth-service
+  labels:
+    app: auth-service
 spec:
   ports:
-  - port: 3001
+  - name: http
+    port: 3001
+    targetPort: 3001
   selector:
     app: auth-service
